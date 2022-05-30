@@ -8,7 +8,7 @@ defmodule EQRCode.Encode do
 
   @error_correction_level SpecTable.error_correction_level()
 
-  @pad <<236, 17>>
+  @pad [1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1]
   @mask0 <<0x99999999999999666666666666669966666666659999999996699533333333332CCD332CCCCCCCCCCCCCCD333333333333332CCD332CCCCCCCCCCCCCCD333333333333332CCD332CCCCCCCCCCCCCCD333333333333332CCD332CCCCCCCCCCCCCCD333333333333332CCD332CCCCCCCCCCCCCCD33333333333333333332CCCCCCCCCD33333333::1072>>
 
   @doc """
@@ -104,7 +104,7 @@ defmodule EQRCode.Encode do
 
     Enum.concat(
       list,
-      Stream.cycle(bits(@pad))
+      Stream.cycle(@pad)
       |> Stream.take(n)
     )
   end

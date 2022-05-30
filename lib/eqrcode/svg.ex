@@ -58,8 +58,8 @@ defmodule EQRCode.SVG do
 
     result =
       Tuple.to_list(matrix)
-      |> Stream.with_index()
-      |> Stream.map(fn {row, row_num} ->
+      |> Enum.with_index()
+      |> Enum.map(fn {row, row_num} ->
         Tuple.to_list(row)
         |> format_row_as_svg(row_num, svg_options)
       end)
@@ -94,8 +94,8 @@ defmodule EQRCode.SVG do
 
   defp format_row_as_svg(row_matrix, row_num, svg_options) do
     row_matrix
-    |> Stream.with_index()
-    |> Stream.map(fn {col, col_num} ->
+    |> Enum.with_index()
+    |> Enum.map(fn {col, col_num} ->
       substitute(col, row_num, col_num, svg_options)
     end)
     |> Enum.to_list()
@@ -103,12 +103,7 @@ defmodule EQRCode.SVG do
 
   defp substitute(data, row_num, col_num, %{})
        when is_nil(data) or data == 0 do
-    %{}
-    |> Map.put(:height, 1)
-    |> Map.put(:style, "fill: transparent;")
-    |> Map.put(:width, 1)
-    |> Map.put(:x, col_num)
-    |> Map.put(:y, row_num)
+    %{height: 1, style: "fill: transparent;", width: 1, x: col_num, y: row_num}
     |> draw_rect
   end
 
@@ -118,33 +113,19 @@ defmodule EQRCode.SVG do
        when (row_num <= 8 and col_num <= 8) or
               (row_num >= size - 9 and col_num <= 8) or
               (row_num <= 8 and col_num >= size - 9) do
-    %{}
-    |> Map.put(:height, 1)
-    |> Map.put(:style, "fill:#{color};")
-    |> Map.put(:width, 1)
-    |> Map.put(:x, col_num)
-    |> Map.put(:y, row_num)
+    %{height: 1, style: "fill:#{color};", width: 1, x: col_num, y: row_num}
     |> draw_rect
   end
 
   defp substitute(1, row_num, col_num, %{color: color, shape: "circle"}) do
     radius = 0.5
 
-    %{}
-    |> Map.put(:cx, col_num + radius)
-    |> Map.put(:cy, row_num + radius)
-    |> Map.put(:r, radius)
-    |> Map.put(:style, "fill:#{color};")
+    %{cx: col_num + radius, cy: row_num + radius, r: radius, style: "fill:#{color};"}
     |> draw_circle
   end
 
   defp substitute(1, row_num, col_num, %{color: color}) do
-    %{}
-    |> Map.put(:height, 1)
-    |> Map.put(:style, "fill:#{color};")
-    |> Map.put(:width, 1)
-    |> Map.put(:x, col_num)
-    |> Map.put(:y, row_num)
+    %{height: 1, style: "fill:#{color};", width: 1, x: col_num, y: row_num}
     |> draw_rect
   end
 
@@ -160,7 +141,6 @@ defmodule EQRCode.SVG do
 
   defp get_attributes(attribute_map) do
     attribute_map
-    |> Enum.map(fn {key, value} -> ~s(#{key}="#{value}") end)
-    |> Enum.join(" ")
+    |> Enum.map_join(" ", fn {key, value} -> ~s(#{key}="#{value}") end)
   end
 end

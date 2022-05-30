@@ -16,7 +16,7 @@ defmodule EQRCode.Mask do
   def rule1(matrix) do
     matrix = for e <- Tuple.to_list(matrix), do: Tuple.to_list(e)
 
-    Stream.concat(matrix, transform(matrix))
+    Enum.concat(matrix, transform(matrix))
     |> Enum.reduce(0, &(do_rule1(&1, {nil, 0}, 0) + &2))
   end
 
@@ -38,12 +38,12 @@ defmodule EQRCode.Mask do
   def rule2(matrix) do
     z = tuple_size(matrix) - 2
 
-    for i <- 0..z,
-        j <- 0..z do
-      EQRCode.Matrix.shape({i, j}, {2, 2})
-      |> Enum.map(&get(matrix, &1))
+    for i <- 0..z, j <- 0..z, reduce: 0 do
+      acc ->
+        EQRCode.Matrix.shape({i, j}, {2, 2})
+        |> Enum.map(&get(matrix, &1))
+        |> do_rule2(acc)
     end
-    |> Enum.reduce(0, &do_rule2/2)
   end
 
   defp do_rule2([1, 1, 1, 1], acc), do: acc + 3
@@ -60,13 +60,15 @@ defmodule EQRCode.Mask do
     for i <- 0..(z - 1),
         j <- 0..(z - 11) do
       [{{i, j}, {11, 1}}, {{j, i}, {1, 11}}]
-      |> Stream.map(fn {a, b} ->
-        EQRCode.Matrix.shape(a, b)
-        |> Enum.map(&get(matrix, &1))
+      |> Enum.reduce(0, fn {a, b}, acc ->
+        res =
+          EQRCode.Matrix.shape(a, b)
+          |> Enum.map(&get(matrix, &1))
+          |> do_rule3()
+
+        res + acc
       end)
-      |> Enum.map(&do_rule3/1)
     end
-    |> List.flatten()
     |> Enum.sum()
   end
 

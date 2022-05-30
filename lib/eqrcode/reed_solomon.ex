@@ -26,7 +26,7 @@ defmodule EQRCode.ReedSolomon do
     rest =
       Stream.zip(rest, tl(e))
       |> Enum.map(fn {x, y} ->
-        bxor(EQRCode.GaloisField.to_i(x),  EQRCode.GaloisField.to_i(y))
+        bxor(EQRCode.GaloisField.to_i(x), EQRCode.GaloisField.to_i(y))
         |> EQRCode.GaloisField.to_a()
       end)
 
@@ -180,7 +180,8 @@ defmodule EQRCode.ReedSolomon do
   defp pad_zip(left, right) do
     [short, long] = Enum.sort_by([left, right], &length/1)
 
-    Stream.concat(short, Stream.cycle([0]))
+    short
+    |> Stream.concat(Stream.cycle([0]))
     |> Stream.zip(long)
   end
 
@@ -188,7 +189,7 @@ defmodule EQRCode.ReedSolomon do
     bch = do_bch_encode(EQRCode.Encode.bits(<<data::bits, 0::10>>))
 
     (EQRCode.Encode.bits(data) ++ bch)
-    |> Stream.zip(EQRCode.Encode.bits(<<@format_mask::15>>))
+    |> Enum.zip(EQRCode.Encode.bits(<<@format_mask::15>>))
     |> Enum.map(fn {a, b} -> bxor(a, b) end)
   end
 
@@ -197,6 +198,7 @@ defmodule EQRCode.ReedSolomon do
 
   defp do_bch_encode(list) do
     EQRCode.Encode.bits(<<@format_generator_polynomial::11>>)
+    # |> Enum.concat(List.duplicate(0, length(list)))
     |> Stream.concat(Stream.cycle([0]))
     |> Stream.zip(list)
     |> Enum.map(fn {a, b} -> bxor(a, b) end)

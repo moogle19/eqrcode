@@ -112,8 +112,8 @@ defmodule EQRCode.Matrix do
 
     matrix =
       [{0, 0}, {z, 0}, {0, z}]
-      |> Stream.flat_map(&shape(&1, {7, 7}))
-      |> Stream.zip(Stream.cycle(@finder_pattern))
+      |> Enum.flat_map(&shape(&1, {7, 7}))
+      |> zip_cycle(@finder_pattern)
       |> Enum.reduce(matrix, fn {coordinate, v}, acc ->
         update(acc, coordinate, v)
       end)
@@ -137,7 +137,7 @@ defmodule EQRCode.Matrix do
         {{z, 0}, {8, 1}},
         {{z, 7}, {1, 8}}
       ]
-      |> Stream.flat_map(fn {a, b} -> shape(a, b) end)
+      |> Enum.flat_map(fn {a, b} -> shape(a, b) end)
       |> Enum.reduce(matrix, &update(&2, &1, 0))
 
     %{m | matrix: matrix}
@@ -152,12 +152,11 @@ defmodule EQRCode.Matrix do
       for(
         x <- @alignments[version],
         y <- @alignments[version],
+        available?(matrix, {x, y}),
         do: {x, y}
       )
-      |> Stream.filter(&available?(matrix, &1))
-      |> Stream.map(fn {x, y} -> {x - 2, y - 2} end)
-      |> Stream.flat_map(&shape(&1, {5, 5}))
-      |> Stream.zip(Stream.cycle(@alignment_pattern))
+      |> Enum.flat_map(fn {x, y} -> shape({x - 2, y - 2}, {5, 5}) end)
+      |> zip_cycle(@alignment_pattern)
       |> Enum.reduce(matrix, fn {coordinate, v}, acc ->
         update(acc, coordinate, v)
       end)
@@ -174,8 +173,8 @@ defmodule EQRCode.Matrix do
 
     matrix =
       [{z, 1}, {1, z}]
-      |> Stream.flat_map(&shape({6, 6}, &1))
-      |> Stream.zip(Stream.cycle([1, 0]))
+      |> Enum.flat_map(&shape({6, 6}, &1))
+      |> zip_cycle([1, 0])
       |> Enum.reduce(matrix, fn {coordinate, v}, acc ->
         update(acc, coordinate, v)
       end)
@@ -201,7 +200,7 @@ defmodule EQRCode.Matrix do
 
     matrix =
       [{{0, 8}, {1, 9}}, {{z, 8}, {1, 8}}, {{8, 0}, {9, 1}}, {{8, z}, {8, 1}}]
-      |> Stream.flat_map(fn {a, b} -> shape(a, b) end)
+      |> Enum.flat_map(fn {a, b} -> shape(a, b) end)
       |> Enum.reduce(matrix, &update(&2, &1, :reserved))
 
     %{m | matrix: matrix}
@@ -218,7 +217,7 @@ defmodule EQRCode.Matrix do
 
     matrix =
       [{{0, z}, {3, 6}}, {{z, 0}, {6, 3}}]
-      |> Stream.flat_map(fn {a, b} -> shape(a, b) end)
+      |> Enum.flat_map(fn {a, b} -> shape(a, b) end)
       |> Enum.reduce(matrix, &update(&2, &1, :reserved))
 
     %{m | matrix: matrix}
@@ -236,12 +235,12 @@ defmodule EQRCode.Matrix do
         n -> {n, n - 2}
       end)
       |> Stream.zip(Stream.cycle([:up, :down]))
-      |> Stream.flat_map(fn {z, path} -> path(path, {modules - 1, z}) end)
-      |> Stream.filter(&available?(matrix, &1))
-      |> Stream.zip(EQRCode.Encode.bits(data))
+      |> Enum.flat_map(fn {z, path} -> path(path, {modules - 1, z}) end)
+      |> Enum.filter(&available?(matrix, &1))
+      |> Enum.zip(EQRCode.Encode.bits(data))
 
     {mask, _, matrix} =
-      Stream.map(0b000..0b111, fn mask ->
+      Enum.map(0b000..0b111, fn mask ->
         matrix =
           Enum.reduce(candidate, matrix, fn {coordinate, v}, acc ->
             update(acc, coordinate, bxor(v, EQRCode.Mask.mask(mask, coordinate)))
@@ -266,9 +265,9 @@ defmodule EQRCode.Matrix do
         n -> {n, n - 2}
       end)
       |> Stream.zip(Stream.cycle([:up, :down]))
-      |> Stream.flat_map(fn {z, path} -> path(path, {modules - 1, z}) end)
-      |> Stream.filter(&available?(matrix, &1))
-      |> Stream.zip(EQRCode.Encode.bits(data))
+      |> Enum.flat_map(fn {z, path} -> path(path, {modules - 1, z}) end)
+      |> Enum.filter(&available?(matrix, &1))
+      |> Enum.zip(EQRCode.Encode.bits(data))
       |> Enum.reduce(matrix, fn {coordinate, v}, acc ->
         update(acc, coordinate, bxor(v, EQRCode.Mask.mask(0, coordinate)))
       end)
@@ -309,9 +308,9 @@ defmodule EQRCode.Matrix do
         {{modules - 1, 8}, {1, -6}},
         {{8, modules - 8}, {8, 1}}
       ]
-      |> Stream.flat_map(fn {a, b} -> shape(a, b) end)
-      |> Stream.filter(&reserved?(matrix, &1))
-      |> Stream.zip(Stream.cycle(data))
+      |> Enum.flat_map(fn {a, b} -> shape(a, b) end)
+      |> Enum.filter(&reserved?(matrix, &1))
+      |> zip_cycle(data)
       |> Enum.reduce(matrix, fn {coordinate, v}, acc ->
         put(acc, coordinate, v)
       end)
@@ -345,9 +344,9 @@ defmodule EQRCode.Matrix do
         {{1, z}, {-1, 1}},
         {{0, z}, {-1, 1}}
       ]
-      |> Stream.flat_map(fn {a, b} -> shape(a, b) end)
-      |> Stream.filter(&reserved?(matrix, &1))
-      |> Stream.zip(Stream.cycle(data))
+      |> Enum.flat_map(fn {a, b} -> shape(a, b) end)
+      |> Enum.filter(&reserved?(matrix, &1))
+      |> zip_cycle(data)
       |> Enum.reduce(matrix, fn {coordinate, v}, acc ->
         put(acc, coordinate, v)
       end)
@@ -423,5 +422,19 @@ defmodule EQRCode.Matrix do
   @spec size(t()) :: integer()
   def size(%__MODULE__{matrix: matrix}) do
     matrix |> Tuple.to_list() |> Enum.count()
+  end
+
+  defp zip_cycle(enum, cycle_pattern) do
+    zip_cycle(enum, cycle_pattern, cycle_pattern, [])
+  end
+
+  defp zip_cycle([], _, _, acc), do: Enum.reverse(acc)
+
+  defp zip_cycle([h | t], [], [hc | tc] = cycle_pattern, acc) do
+    zip_cycle(t, tc, cycle_pattern, [{h, hc} | acc])
+  end
+
+  defp zip_cycle([h | t], [hc | tc], cycle_pattern, acc) do
+    zip_cycle(t, tc, cycle_pattern, [{h, hc} | acc])
   end
 end
