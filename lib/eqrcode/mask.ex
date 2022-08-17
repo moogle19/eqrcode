@@ -1,6 +1,9 @@
 defmodule EQRCode.Mask do
   @moduledoc false
 
+  @versions 1..40
+  @modules Enum.map(@versions, &((&1 - 1) * 4 + 21))
+
   @doc """
   Get the total score for the masked matrix.
   """
@@ -35,14 +38,18 @@ defmodule EQRCode.Mask do
   Check for 2x2 blocks.
   """
   @spec rule2(EQRCode.Matrix.matrix()) :: integer
-  def rule2(matrix) do
-    z = tuple_size(matrix) - 2
+  def rule2(matrix)
 
-    for i <- 0..z, j <- 0..z, reduce: 0 do
-      acc ->
-        EQRCode.Matrix.shape({i, j}, {2, 2})
+  for modules <- @modules do
+    z = modules - 2
+    ij = for i <- 0..z, j <- 0..z, do: {i, j}
+
+    def rule2(matrix) when tuple_size(matrix) == unquote(modules) do
+      Enum.reduce(unquote(ij), 0, fn {i, j}, acc ->
+        EQRCode.Helpers.shape({i, j}, {2, 2})
         |> Enum.map(&get(matrix, &1))
         |> do_rule2(acc)
+      end)
     end
   end
 
@@ -62,7 +69,7 @@ defmodule EQRCode.Mask do
       [{{i, j}, {11, 1}}, {{j, i}, {1, 11}}]
       |> Enum.reduce(0, fn {a, b}, acc ->
         res =
-          EQRCode.Matrix.shape(a, b)
+          EQRCode.Helpers.shape(a, b)
           |> Enum.map(&get(matrix, &1))
           |> do_rule3()
 
@@ -97,7 +104,9 @@ defmodule EQRCode.Mask do
   defp do_rule4(_, acc), do: acc
 
   defp get(matrix, {x, y}) do
-    get_in(matrix, [Access.elem(x), Access.elem(y)])
+    matrix
+    |> elem(x)
+    |> elem(y)
   end
 
   @doc """

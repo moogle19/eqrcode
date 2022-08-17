@@ -4,11 +4,11 @@ defmodule EQRCode.Matrix do
   alias EQRCode.SpecTable
 
   import Bitwise
+  import EQRCode.Helpers
 
   @derive {Inspect, only: [:version, :error_correction_level, :modules, :mask]}
   defstruct [:version, :error_correction_level, :modules, :mask, :matrix]
 
-  @type coordinate :: {non_neg_integer(), non_neg_integer()}
   @type matrix :: term
   @type t :: %__MODULE__{
           version: SpecTable.version(),
@@ -60,6 +60,9 @@ defmodule EQRCode.Matrix do
     40 => [6, 30, 58, 86, 114, 142, 170]
   }
 
+  @versions 1..40
+  @modules Enum.map(@versions, &((&1 - 1) * 4 + 21))
+
   @finder_pattern Code.eval_string("""
                   [
                     1, 1, 1, 1, 1, 1, 1,
@@ -107,18 +110,25 @@ defmodule EQRCode.Matrix do
   Draw the finder patterns, three at a time.
   """
   @spec draw_finder_patterns(t) :: t
-  def draw_finder_patterns(%__MODULE__{matrix: matrix, modules: modules} = m) do
+  def draw_finder_patterns(matrix)
+
+  for modules <- @modules do
     z = modules - 7
 
-    matrix =
+    finder_patterns =
       [{0, 0}, {z, 0}, {0, z}]
       |> Enum.flat_map(&shape(&1, {7, 7}))
       |> zip_cycle(@finder_pattern)
-      |> Enum.reduce(matrix, fn {coordinate, v}, acc ->
-        update(acc, coordinate, v)
-      end)
 
-    %{m | matrix: matrix}
+    def draw_finder_patterns(%__MODULE__{matrix: matrix, modules: unquote(modules)} = m) do
+      matrix =
+        unquote(finder_patterns)
+        |> Enum.reduce(matrix, fn {coordinate, v}, acc ->
+          update(acc, coordinate, v)
+        end)
+
+      %{m | matrix: matrix}
+    end
   end
 
   @doc """
@@ -355,11 +365,14 @@ defmodule EQRCode.Matrix do
   end
 
   defp reserved?(matrix, {x, y}) do
-    get_in(matrix, [Access.elem(x), Access.elem(y)]) == :reserved
+    :reserved ==
+      matrix
+      |> elem(x)
+      |> elem(y)
   end
 
   defp put(matrix, {x, y}, value) do
-    put_in(matrix, [Access.elem(x), Access.elem(y)], value)
+    put_elem(matrix, x, put_elem(elem(matrix, x), y, value))
   end
 
   @doc """
@@ -371,12 +384,15 @@ defmodule EQRCode.Matrix do
 
     matrix =
       Enum.reduce(0..(modules - 1), matrix, fn i, acc ->
-        update_in(acc, [Access.elem(i)], fn row ->
-          Tuple.insert_at(row, 0, 0)
+        put_elem(
+          acc,
+          i,
+          elem(acc, i)
+          |> Tuple.insert_at(0, 0)
           |> Tuple.insert_at(0, 0)
           |> Tuple.append(0)
           |> Tuple.append(0)
-        end)
+        )
       end)
       |> Tuple.insert_at(0, zone)
       |> Tuple.insert_at(0, zone)
@@ -386,34 +402,21 @@ defmodule EQRCode.Matrix do
     %{m | matrix: matrix}
   end
 
-  @doc """
-  Given the starting point {x, y} and {width, height}
-  returns the coordinates of the shape.
-
-  ## Examples
-
-      iex> EQRCode.Matrix.shape({0, 0}, {3, 3})
-      [{0, 0}, {0, 1}, {0, 2},
-       {1, 0}, {1, 1}, {1, 2},
-       {2, 0}, {2, 1}, {2, 2}]
-
-  """
-  @spec shape(coordinate, {integer, integer}) :: [coordinate]
-  def shape({x, y}, {w, h}) do
-    for i <- x..(x + h - 1),
-        j <- y..(y + w - 1),
-        do: {i, j}
-  end
-
   defp update(matrix, {x, y}, value) do
-    update_in(matrix, [Access.elem(x), Access.elem(y)], fn
-      nil -> value
-      val -> val
-    end)
+    y_val = elem(matrix, x)
+
+    if is_nil(elem(y_val, y)) do
+      put_elem(matrix, x, put_elem(y_val, y, value))
+    else
+      matrix
+    end
   end
 
   defp available?(matrix, {x, y}) do
-    get_in(matrix, [Access.elem(x), Access.elem(y)]) == nil
+    matrix
+    |> elem(x)
+    |> elem(y)
+    |> is_nil()
   end
 
   @doc """
@@ -422,19 +425,5 @@ defmodule EQRCode.Matrix do
   @spec size(t()) :: integer()
   def size(%__MODULE__{matrix: matrix}) do
     matrix |> Tuple.to_list() |> Enum.count()
-  end
-
-  defp zip_cycle(enum, cycle_pattern) do
-    zip_cycle(enum, cycle_pattern, cycle_pattern, [])
-  end
-
-  defp zip_cycle([], _, _, acc), do: Enum.reverse(acc)
-
-  defp zip_cycle([h | t], [], [hc | tc] = cycle_pattern, acc) do
-    zip_cycle(t, tc, cycle_pattern, [{h, hc} | acc])
-  end
-
-  defp zip_cycle([h | t], [hc | tc], cycle_pattern, acc) do
-    zip_cycle(t, tc, cycle_pattern, [{h, hc} | acc])
   end
 end

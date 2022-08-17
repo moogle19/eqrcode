@@ -11,8 +11,8 @@ Benchee.run(
     # "svg_encode" => fn -> Enum.map(contents, fn content -> content |> EQRCode.encode() |> EQRCode.svg() end) end,
     # "png_encode" => fn -> Enum.map(contents, fn content -> content |> EQRCode.encode() |> EQRCode.png() end) end,
   },
-  time: 30,
-  memory_time: 10,
-  reduction_time: 10,
+  time: 10,
+  memory_time: 5,
+  reduction_time: 5,
   profile_after: true
 )
